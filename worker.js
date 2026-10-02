@@ -63,6 +63,17 @@ export default {
         const { username, password } = await request.json();
         const hashed = await hashPassword(password);
         const id = generateId();
+
+        // Auto-initialize tables if they don't exist (Runs once during first registration)
+        try {
+          await env.DB.batch([
+            env.DB.prepare("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"),
+            env.DB.prepare("CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)"),
+            env.DB.prepare("CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE)")
+          ]);
+        } catch (e) {
+          console.error("Failed to auto-create tables:", e);
+        }
         
         try {
           await env.DB.prepare(
@@ -93,6 +104,17 @@ export default {
       if (path === "/api/conversations" && request.method === "POST") {
         const { userId, title } = await request.json();
         const id = generateId();
+
+        // Auto-initialize tables if they don't exist (Runs once during first registration)
+        try {
+          await env.DB.batch([
+            env.DB.prepare("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"),
+            env.DB.prepare("CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, title TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)"),
+            env.DB.prepare("CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE)")
+          ]);
+        } catch (e) {
+          console.error("Failed to auto-create tables:", e);
+        }
         await env.DB.prepare(
           "INSERT INTO conversations (id, user_id, title) VALUES (?, ?, ?)"
         ).bind(id, userId, title).run();
@@ -206,3 +228,4 @@ export default {
     }
   }
 };
+
