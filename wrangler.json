@@ -17,5 +17,8 @@
   },
   "observability": {
     "enabled": true
+  },
+  "assets": {
+    "directory": "./frontend/dist"
   }
 }
