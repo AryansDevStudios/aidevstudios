@@ -5,7 +5,7 @@ interface AuthProps {
   onAuth: (user: any) => void;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://localhost:8787");
+const API_URL = import.meta.env.VITE_API_URL || "https://aidevstudios.adsbackend01.workers.dev";
 
 export default function Auth({ onAuth }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
@@ -112,4 +112,5 @@ export default function Auth({ onAuth }: AuthProps) {
     </div>
   );
 }
+
 

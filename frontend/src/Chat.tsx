@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://localhost:8787");
+const API_URL = import.meta.env.VITE_API_URL || "https://aidevstudios.adsbackend01.workers.dev";
 
 interface ChatProps {
   user: any;
@@ -239,4 +239,5 @@ export default function Chat({ user, conversationId, setConversationId, model, e
     </div>
   );
 }
+
 
