@@ -5,7 +5,7 @@ import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || "https://aidevstudios.adsbackend01.workers.dev";
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? "" : "http://localhost:8787");
 
 interface ChatProps {
   user: any;
@@ -13,9 +13,10 @@ interface ChatProps {
   setConversationId: (id: string) => void;
   model: string;
   extendedThinking: boolean;
+  deductUsage: (amount: number) => void;
 }
 
-export default function Chat({ user, conversationId, setConversationId, model, extendedThinking }: ChatProps) {
+export default function Chat({ user, conversationId, setConversationId, model, extendedThinking, deductUsage }: ChatProps) {
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -64,11 +65,16 @@ export default function Chat({ user, conversationId, setConversationId, model, e
     setInput("");
     
     let currentConvId = conversationId;
+    // Auto-generate title on the backend for new chats! We just use "New Chat" temporarily.
     if (!currentConvId) {
-      currentConvId = await createConversation(userMsg.slice(0, 30) + (userMsg.length > 30 ? '...' : ''));
+      currentConvId = await createConversation("New Chat");
     }
 
-    const newMessages = [...messages, { role: "user", content: userMsg }];
+    // Filter out any previous empty messages to prevent 500 API errors
+    const validMessages = messages.filter(m => m.content && m.content.trim() !== "");
+    const newMessages = [...validMessages, { role: "user", content: userMsg }];
+    
+    // Add temporary assistant message for UI
     setMessages([...newMessages, { role: "assistant", content: "" }]);
     setIsLoading(true);
 
@@ -83,12 +89,13 @@ export default function Chat({ user, conversationId, setConversationId, model, e
         body: JSON.stringify({
           model,
           system: systemPrompt,
-          messages: newMessages,
+          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
           stream: true,
           conversationId: currentConvId
         }),
       });
 
+      if (!res.ok) throw new Error("Server error: " + res.status);
       if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
@@ -109,29 +116,33 @@ export default function Chat({ user, conversationId, setConversationId, model, e
 
             try {
               const parsed = JSON.parse(jsonStr);
-              // Handle both standard Cloudflare AI and OpenAI compatible formats
+              // Fallback chaining depending on the model's SSE format
               const token = parsed.response !== undefined 
                 ? parsed.response 
                 : (parsed.choices?.[0]?.delta?.content || "");
               
-              fullReply += token;
-              
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1].content = fullReply;
-                return updated;
-              });
+              if (token) {
+                fullReply += token;
+                deductUsage(1); // Deduct usage counter smoothly
+                
+                // Real-time state update to trigger Markdown re-render streams!
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1].content = fullReply;
+                  return updated;
+                });
+              }
             } catch (e) {
-              // Incomplete JSON chunk, skip
+              // Ignore partial JSON chunks until stream completes the buffer
             }
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setMessages(prev => {
         const updated = [...prev];
-        updated[updated.length - 1].content = "Error: Failed to fetch response from AI.";
+        updated[updated.length - 1].content = "⚠️ Error: Failed to fetch response. Try selecting a different model.";
         return updated;
       });
     } finally {
@@ -142,7 +153,7 @@ export default function Chat({ user, conversationId, setConversationId, model, e
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
@@ -163,7 +174,7 @@ export default function Chat({ user, conversationId, setConversationId, model, e
                 <button 
                   key={i}
                   onClick={() => setInput(hint)}
-                  className="p-4 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-yellow-50 dark:hover:bg-gray-700 border border-transparent hover:border-yellow-200 dark:hover:border-gray-600 transition-all"
+                  className="p-4 text-sm text-left text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-yellow-50 dark:hover:bg-gray-700 border border-transparent hover:border-yellow-200 dark:hover:border-gray-600 transition-all shadow-sm"
                 >
                   {hint}
                 </button>
@@ -172,40 +183,51 @@ export default function Chat({ user, conversationId, setConversationId, model, e
           </div>
         ) : (
           <div className="max-w-4xl mx-auto space-y-6">
-            {messages.map((msg, idx) => (
-              <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.role === 'assistant' && (
-                  <div className="w-8 h-8 flex-shrink-0 rounded-full bg-yellow-400 flex items-center justify-center mt-1">
-                    <Bot size={18} className="text-gray-900" />
-                  </div>
-                )}
-                
-                <div className={`max-w-[85%] rounded-2xl px-5 py-4 ${
-                  msg.role === 'user' 
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-br-none' 
-                    : 'bg-transparent text-gray-900 dark:text-gray-100'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkMath]} 
-                        rehypePlugins={[rehypeKatex]}
-                      >
-                        {msg.content || '...'}
-                      </ReactMarkdown>
+            {messages.map((msg, idx) => {
+              if (!msg.content && !isLoading) return null; // Don't show empty ghost messages
+              
+              return (
+                <div key={idx} className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {msg.role === 'assistant' && (
+                    <div className="w-8 h-8 flex-shrink-0 rounded-full bg-yellow-400 flex items-center justify-center mt-1 shadow-sm">
+                      <Bot size={18} className="text-gray-900" />
                     </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  )}
+                  
+                  <div className={`max-w-[85%] rounded-2xl px-5 py-4 shadow-sm ${
+                    msg.role === 'user' 
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-br-none border border-gray-200 dark:border-gray-700' 
+                      : 'bg-transparent text-gray-900 dark:text-gray-100'
+                  }`}>
+                    {msg.role === 'assistant' ? (
+                      <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700">
+                        {msg.content === "" && isLoading ? (
+                          <div className="flex items-center gap-2 text-yellow-500">
+                            <Loader2 size={16} className="animate-spin" />
+                            <span className="text-sm font-medium">Thinking...</span>
+                          </div>
+                        ) : (
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkMath]} 
+                            rehypePlugins={[rehypeKatex]}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    )}
+                  </div>
+                  
+                  {msg.role === 'user' && (
+                    <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center mt-1 border border-gray-400 dark:border-gray-600">
+                      <User size={18} className="text-gray-600 dark:text-gray-300" />
+                    </div>
                   )}
                 </div>
-                
-                {msg.role === 'user' && (
-                  <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center mt-1">
-                    <User size={18} className="text-gray-600 dark:text-gray-300" />
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -213,7 +235,7 @@ export default function Chat({ user, conversationId, setConversationId, model, e
 
       <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent dark:from-gray-900 dark:via-gray-900 pt-10">
         <div className="max-w-4xl mx-auto relative">
-          <form onSubmit={handleSubmit} className="relative flex items-end shadow-xl rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden focus-within:ring-2 focus-within:ring-yellow-400 transition-shadow">
+          <form onSubmit={handleSubmit} className="relative flex items-end shadow-xl shadow-gray-200/50 dark:shadow-black/50 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 overflow-hidden focus-within:ring-2 focus-within:ring-yellow-400 transition-all">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -226,19 +248,16 @@ export default function Chat({ user, conversationId, setConversationId, model, e
             <button 
               type="submit" 
               disabled={isLoading || !input.trim()}
-              className="absolute right-3 bottom-3 p-2 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-gray-900 disabled:opacity-50 disabled:hover:bg-yellow-400 transition-colors"
+              className="absolute right-3 bottom-3 p-2 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-gray-900 disabled:opacity-50 disabled:hover:bg-yellow-400 transition-colors shadow-sm"
             >
               {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>
           </form>
-          <div className="text-center mt-2">
-            <span className="text-xs text-gray-400">AIDevStudios can make mistakes. Consider verifying important information.</span>
+          <div className="text-center mt-3">
+            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium tracking-wide">AIDevStudios can make mistakes. Verify important information.</span>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-
-
