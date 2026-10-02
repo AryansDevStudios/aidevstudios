@@ -9,7 +9,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
-  const [model, setModel] = useState('@cf/openai/gpt-oss-20b');
+  const [model, setModel] = useState('@cf/meta/llama-3-8b-instruct');
   const [extendedThinking, setExtendedThinking] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [usageCounter, setUsageCounter] = useState(100000); // 100k daily free limit mockup
@@ -135,8 +135,8 @@ export default function App() {
                   className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:ring-2 focus:ring-yellow-400 outline-none appearance-none"
                 >
                   <optgroup label="Flagship / High Performance">
-                    <option value="@cf/openai/gpt-oss-20b">GPT OSS 20B (Default)</option>
-                    <option value="@cf/meta/llama-3-8b-instruct">Llama 3 (8B Instruct)</option>
+                    <option value="@cf/openai/gpt-oss-20b">GPT OSS 20B</option>
+                    <option value="@cf/meta/llama-3-8b-instruct">Llama 3 8B (Default)</option>
                   </optgroup>
                   <optgroup label="Medium Tasks">
                     <option value="@cf/mistral/mistral-7b-instruct-v0.1">Mistral 7B Instruct</option>
@@ -176,3 +176,4 @@ export default function App() {
     </div>
   );
 }
+
