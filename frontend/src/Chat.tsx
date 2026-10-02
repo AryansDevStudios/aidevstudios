@@ -142,7 +142,7 @@ export default function Chat({ user, conversationId, setConversationId, model, e
       console.error(err);
       setMessages(prev => {
         const updated = [...prev];
-        updated[updated.length - 1].content = "⚠️ Error: Failed to fetch response. Try selecting a different model.";
+        if (updated.length > 0) { updated[updated.length - 1] = { ...updated[updated.length - 1], content: "⚠️ Error: Failed to connect to the AI model. Try selecting a different model from Settings (e.g. Llama 3)." }; }
         return updated;
       });
     } finally {
@@ -261,3 +261,4 @@ export default function Chat({ user, conversationId, setConversationId, model, e
     </div>
   );
 }
+
