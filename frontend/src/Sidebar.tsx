@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, MessageSquare, LogOut, X } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "https://aidevstudios.adsbackend01.workers.dev";
@@ -97,5 +97,6 @@ export default function Sidebar({ user, activeConversation, setActiveConversatio
     </div>
   );
 }
+
 
 

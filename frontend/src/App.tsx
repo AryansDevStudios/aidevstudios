@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Auth from './Auth';
 import Chat from './Chat';
 import Sidebar from './Sidebar';
@@ -146,3 +146,4 @@ export default function App() {
     </div>
   );
 }
+

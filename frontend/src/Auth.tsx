@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Bot } from 'lucide-react';
 
 interface AuthProps {
@@ -112,5 +112,6 @@ export default function Auth({ onAuth }: AuthProps) {
     </div>
   );
 }
+
 
 
